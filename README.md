@@ -64,6 +64,8 @@ A live preview without Home Assistant is available in
 | `animate` | `true` | Flip animation when values change. |
 | `hide_empty` | `true` | Hide a section when it has no services. |
 | `show_clock` | `true` | Live clock in the header. |
+| `show_route` | `false` | Show the route number as a leading column. |
+| `route_chars` | `5` | Flap width of the route column. |
 | `destination_chars` | `16` | Flap width of the destination / origin column. Longer names are truncated. |
 | `departures_label` | `Departures` | Section label. |
 | `arrivals_label` | `Arrivals` | Section label. |
@@ -90,6 +92,17 @@ boardable → **departing**. If your integration version does not yet expose
 works well at terminus stations. Destination and origin station names are
 parsed from the headsign (the text after / before `To`).
 
+## Credits
+
+This card is a restyle of the **Auckland Transport Card** by
+[Daniel Seitz](https://github.com/SeitzDaniel) — specifically the
+[`arrival-departure-icon`](https://github.com/jtbnz/auckland-transport-card/tree/arrival-departure-icon)
+branch of [jtbnz/auckland-transport-card](https://github.com/jtbnz/auckland-transport-card)
+(a fork of [SeitzDaniel/auckland-transport-card](https://github.com/SeitzDaniel/auckland-transport-card)).
+It depends on the [Auckland Transport integration](https://github.com/SeitzDaniel/auckland_transport),
+also by Daniel Seitz.
+
 ## License
 
-MIT
+MIT © [Daniel Seitz](https://github.com/SeitzDaniel) (original card),
+restyle by [jtbnz](https://github.com/jtbnz)

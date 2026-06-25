@@ -5,6 +5,10 @@
   A traditional split-flap (Solari) departure / arrivals board for the
   Auckland Transport integration (https://github.com/SeitzDaniel/auckland_transport).
 
+  Restyle of the Auckland Transport Card by Daniel Seitz (MIT) — based on the
+  arrival-departure-icon branch of https://github.com/jtbnz/auckland-transport-card
+  (fork of https://github.com/SeitzDaniel/auckland-transport-card).
+
   It reads the numbered `departure_N_*` attributes from an Auckland Transport
   sensor and splits services into two boards using the GTFS pickup_type:
 
@@ -21,6 +25,8 @@
     - animate                  flip animation on change (default true)
     - hide_empty               hide a section when it has no services (default true)
     - show_clock               show a live clock in the header (default true)
+    - show_route               show the route number as a leading column (default false)
+    - route_chars              flap width of the route column (default 5)
     - destination_chars        flap width of the destination/origin column (default 16)
     - departures_label         section label (default 'Departures')
     - arrivals_label           section label (default 'Arrivals')
@@ -42,6 +48,8 @@ const DEFAULTS = {
   animate: true,
   hide_empty: true,
   show_clock: true,
+  show_route: false,
+  route_chars: 5,
   destination_chars: 16,
   departures_label: 'Departures',
   arrivals_label: 'Arrivals',
@@ -297,8 +305,8 @@ class SplitFlapCard extends HTMLElement {
     this._emptyEl.style.display = 'none';
     this._sectionsEl.style.display = 'flex';
 
-    this._fillSection(this._depCells, departures, 'departure', hideEmpty);
-    this._fillSection(this._arrCells, arrivals, 'arrival', hideEmpty);
+    this._fillSection(this._depCells, departures, hideEmpty);
+    this._fillSection(this._arrCells, arrivals, hideEmpty);
   }
 
   _computeLayoutSig(departures, arrivals) {
@@ -312,6 +320,7 @@ class SplitFlapCard extends HTMLElement {
       showDep ? depCount : 'x',
       showArr ? arrCount : 'x',
       this._config.destination_chars,
+      this._config.show_route ? `r${this._config.route_chars}` : 'r0',
     ].join('|');
   }
 
@@ -377,27 +386,38 @@ class SplitFlapCard extends HTMLElement {
 
     const mode = this._config.board;
     const destChars = Math.max(4, Number(this._config.destination_chars) || 16);
+    const routeChars = Math.max(2, Number(this._config.route_chars) || 5);
+    const routeCol = this._config.show_route
+      ? [{ key: 'route', label: 'Route', chars: routeChars }]
+      : [];
 
     if (mode !== 'arrivals' && (departures.length > 0 || !this._config.hide_empty)) {
       this._depCells = this._buildSection(
         this._config.departures_label,
-        ['Destination', 'Sched', 'Actual'],
-        [destChars, 5, 5],
+        [
+          ...routeCol,
+          { key: 'destination', label: 'Destination', chars: destChars },
+          { key: 'scheduled', label: 'Sched', chars: 5, time: true },
+          { key: 'actual', label: 'Actual', chars: 5, time: true, status: true },
+        ],
         Math.max(departures.length, 1),
       );
     }
     if (mode !== 'departures' && (arrivals.length > 0 || !this._config.hide_empty)) {
       this._arrCells = this._buildSection(
         this._config.arrivals_label,
-        ['From', 'ETA'],
-        [destChars, 5],
+        [
+          ...routeCol,
+          { key: 'origin', label: 'From', chars: destChars },
+          { key: 'eta', label: 'ETA', chars: 5, time: true, status: true },
+        ],
         Math.max(arrivals.length, 1),
       );
     }
   }
 
-  // Returns the array of per-row cell records so _fillSection can update them.
-  _buildSection(label, headers, charWidths, rowCount) {
+  // Returns the per-row cell records (keyed by column) so _fillSection can update them.
+  _buildSection(label, columns, rowCount) {
     const section = document.createElement('div');
     section.className = 'sf-section';
 
@@ -416,27 +436,27 @@ class SplitFlapCard extends HTMLElement {
     grid.className = 'sf-grid';
     // Each column sizes to its flaps; rows pad to a fixed char count so every
     // column is uniform width and aligns down the board.
-    grid.style.gridTemplateColumns = charWidths.map(() => 'max-content').join(' ');
+    grid.style.gridTemplateColumns = columns.map(() => 'max-content').join(' ');
 
     // Column header labels.
-    headers.forEach((h, i) => {
+    columns.forEach((col) => {
       const hc = document.createElement('div');
       hc.className = 'sf-col-head';
-      if (i > 0) hc.classList.add('sf-col-time');
-      hc.textContent = h.toUpperCase();
+      if (col.time) hc.classList.add('sf-col-time');
+      hc.textContent = col.label.toUpperCase();
       grid.appendChild(hc);
     });
 
     const rows = [];
     for (let r = 0; r < rowCount; r += 1) {
       const cells = [];
-      charWidths.forEach((chars, i) => {
+      columns.forEach((col) => {
         const cell = document.createElement('div');
         cell.className = 'sf-cell';
-        if (i > 0) cell.classList.add('sf-cell-time');
-        this._ensureFlaps(cell, chars);
+        if (col.time) cell.classList.add('sf-cell-time');
+        this._ensureFlaps(cell, col.chars);
         grid.appendChild(cell);
-        cells.push({ el: cell, chars });
+        cells.push({ el: cell, chars: col.chars, key: col.key, status: !!col.status });
       });
       rows.push(cells);
     }
@@ -446,28 +466,34 @@ class SplitFlapCard extends HTMLElement {
     return { section, rows };
   }
 
-  _fillSection(sectionRef, items, kind, hideEmpty) {
+  _fillSection(sectionRef, items, hideEmpty) {
     if (!sectionRef) return;
     const hasItems = items.length > 0;
     sectionRef.section.style.display = hasItems || !hideEmpty ? 'block' : 'none';
 
     sectionRef.rows.forEach((cells, idx) => {
       const item = items[idx];
-      if (!item) {
-        cells.forEach((c) => this._setFlaps(c.el, '', c.chars));
-        return;
-      }
-      if (kind === 'departure') {
-        const dest = item.destination || item.headsign || item.route || '';
-        this._setFlaps(cells[0].el, dest, cells[0].chars);
-        this._setFlaps(cells[1].el, this._formatTime(item.scheduled), cells[1].chars);
-        this._setFlaps(cells[2].el, this._formatTime(item.actual), cells[2].chars, this._delayClass(item));
-      } else {
-        const from = item.origin || item.route || item.headsign || '';
-        this._setFlaps(cells[0].el, from, cells[0].chars);
-        this._setFlaps(cells[1].el, this._formatTime(item.actual), cells[1].chars, this._delayClass(item));
-      }
+      cells.forEach((c) => {
+        if (!item) {
+          this._setFlaps(c.el, '', c.chars);
+          return;
+        }
+        const status = c.status ? this._delayClass(item) : undefined;
+        this._setFlaps(c.el, this._cellValue(item, c.key), c.chars, status);
+      });
     });
+  }
+
+  _cellValue(item, key) {
+    switch (key) {
+      case 'route': return item.route || '';
+      case 'destination': return item.destination || item.headsign || item.route || '';
+      case 'origin': return item.origin || item.route || item.headsign || '';
+      case 'scheduled': return this._formatTime(item.scheduled);
+      case 'actual':
+      case 'eta': return this._formatTime(item.actual);
+      default: return '';
+    }
   }
 
   _delayClass(item) {
@@ -713,6 +739,7 @@ const EDITOR_SCHEMA = [
       { name: 'animate', selector: { boolean: {} } },
       { name: 'show_clock', selector: { boolean: {} } },
       { name: 'hide_empty', selector: { boolean: {} } },
+      { name: 'show_route', selector: { boolean: {} } },
     ],
   },
   {
@@ -745,6 +772,7 @@ const EDITOR_LABELS = {
   animate: 'Flip animation',
   show_clock: 'Show clock',
   hide_empty: 'Hide empty section',
+  show_route: 'Show route number',
   departures_label: 'Departures label',
   arrivals_label: 'Arrivals label',
   text_color: 'Character colour',
