@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Split-Flap Card — Demo</title>
+  <style>
+    body {
+      margin: 0;
+      background: #16171a;
+      color: #ddd;
+      font-family: "Helvetica Neue", Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 32px 16px;
+      gap: 24px;
+    }
+    h1 { font-weight: 600; letter-spacing: 0.04em; }
+    .stage { width: min(680px, 100%); }
+    /* Minimal stand-in for HA's <ha-card> so the demo works without Home Assistant. */
+    ha-card { display: block; }
+  </style>
+</head>
+<body>
+  <h1>Split-Flap Departure Board — preview</h1>
+  <div class="stage" id="stage"></div>
+
+  <script type="module" src="./split-flap-card.js"></script>
+  <script type="module">
+    // Sample Auckland Transport sensor state: a mix of boardable departures
+    // (pickup_type 0) and a terminating arrival (pickup_type 1).
+    const attrs = {
+      stop_name: 'Britomart Train Station',
+      stop_code: '9300',
+      remaining_departures_for_today: 5,
+
+      departure_1_scheduled_time: '14:32:00',
+      departure_1_actual_time: '14:34:00',
+      departure_1_delay_in_seconds: 120,
+      departure_1_headsign: 'Britomart 1 To Pukekohe 2 Via Newmarket',
+      departure_1_route: 'STH',
+      departure_1_pickup_type: 0,
+
+      departure_2_scheduled_time: '14:38:00',
+      departure_2_actual_time: '14:38:00',
+      departure_2_delay_in_seconds: 0,
+      departure_2_headsign: 'Britomart 2 To Swanson 3 Via Newmarket',
+      departure_2_route: 'WEST',
+      departure_2_pickup_type: 0,
+
+      departure_3_scheduled_time: '14:45:00',
+      departure_3_actual_time: '14:43:00',
+      departure_3_delay_in_seconds: -120,
+      departure_3_headsign: 'Britomart 1 To Manukau 4',
+      departure_3_route: 'EAST',
+      departure_3_pickup_type: 0,
+
+      departure_4_scheduled_time: '14:29:00',
+      departure_4_actual_time: '14:36:00',
+      departure_4_delay_in_seconds: 420,
+      departure_4_headsign: 'Pukekohe 2 To Britomart 1 Via Newmarket',
+      departure_4_route: 'STH',
+      departure_4_pickup_type: 1,
+
+      departure_5_scheduled_time: '14:41:00',
+      departure_5_actual_time: '14:41:00',
+      departure_5_delay_in_seconds: 0,
+      departure_5_headsign: 'Swanson 1 To Britomart 5 Via Newmarket',
+      departure_5_route: 'WEST',
+      departure_5_pickup_type: 1,
+    };
+
+    const hass = {
+      states: {
+        'sensor.auckland_transport_britomart': {
+          entity_id: 'sensor.auckland_transport_britomart',
+          state: '14:34:00',
+          attributes: attrs,
+        },
+      },
+    };
+
+    customElements.whenDefined('split-flap-card').then(() => {
+      const card = document.createElement('split-flap-card');
+      card.setConfig({
+        entity: 'sensor.auckland_transport_britomart',
+        board: 'both',
+      });
+      card.hass = hass;
+      document.getElementById('stage').appendChild(card);
+
+      // Mutate a time every few seconds so the flip animation is visible.
+      let t = 0;
+      setInterval(() => {
+        t += 1;
+        const mins = 34 + (t % 6);
+        attrs.departure_1_actual_time = `14:${mins.toString().padStart(2, '0')}:00`;
+        attrs.departure_1_delay_in_seconds = (mins - 32) * 60;
+        card.hass = { states: { ...hass.states } };
+      }, 3500);
+    });
+  </script>
+</body>
+</html>
