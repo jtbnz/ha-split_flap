@@ -37,7 +37,7 @@
 
 /* global customElements, HTMLElement, setInterval, clearInterval, setTimeout */
 
-const CARD_VERSION = 'v1.0.0';
+const CARD_VERSION = 'v1.1.0';
 
 const DEFAULTS = {
   title: undefined,
